@@ -1,0 +1,41 @@
+import streamlit as st
+from moviepy.editor import ImageClip, concatenate_videoclips, vfx
+import tempfile
+
+st.set_page_config(page_title="비요일 영상 제작소", page_icon="☔")
+st.title("☔ 비요일(Biyoil) 숏폼 자동 제작기")
+st.subheader("4050 타겟 우아한 양우산 홍보 영상")
+
+# 파일 업로드
+images = st.file_uploader("제품 사진 10~15장을 올려주세요", accept_multiple_files=True, type=['jpg', 'jpeg', 'png'])
+logo = st.file_uploader("브랜드 로고 이미지를 올려주세요", type=['jpg', 'jpeg', 'png'])
+
+if st.button("영상 생성하기"):
+    if images and logo:
+        with st.spinner('영상을 우아하게 제작 중입니다...'):
+            clips = []
+            # 1. 사진 클립 생성 (장당 1.5초, 페이드 효과)
+            for img in images:
+                tfile = tempfile.NamedTemporaryFile(delete=False)
+                tfile.write(img.read())
+                clip = ImageClip(tfile.name).set_duration(1.5).resize(height=1920)
+                clip = clip.set_fps(24).crossfadein(0.5)
+                clips.append(clip)
+            
+            # 2. 로고 엔딩 (3초, 줌인 효과)
+            lfile = tempfile.NamedTemporaryFile(delete=False)
+            lfile.write(logo.read())
+            logo_clip = ImageClip(lfile.name).set_duration(3).resize(height=1920)
+            logo_clip = logo_clip.fx(vfx.resize, lambda t: 1 + 0.03 * t) # 서서히 커지는 효과
+            logo_clip = logo_clip.set_fps(24).crossfadein(1.0)
+            clips.append(logo_clip)
+            
+            # 3. 합치기 및 출력
+            final_video = concatenate_videoclips(clips, method="compose")
+            output_path = "biyoil_video.mp4"
+            final_video.write_videofile(output_path, fps=24, codec="libx264")
+            
+            st.video(output_path)
+            st.success("완성되었습니다! 위 영상에서 마우스 우클릭하여 저장하세요.")
+    else:
+        st.error("사진과 로고를 모두 올려주세요.")
