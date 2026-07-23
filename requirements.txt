@@ -1,3 +1,5 @@
 streamlit
 moviepy==1.0.3
-imageio[ffmpeg]
+Pillow==9.5.0
+imageio==2.25.1
+imageio-ffmpeg==0.4.8
