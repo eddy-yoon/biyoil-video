@@ -1,1 +1,4 @@
-text streamlit moviepy Pillow
+streamlit
+moviepy==1.0.3
+Pillow==9.5.0
+imageio[ffmpeg]
