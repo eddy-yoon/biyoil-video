@@ -1,41 +1,60 @@
 import streamlit as st
-from moviepy.editor import ImageClip, concatenate_videoclips, vfx
+from moviepy.editor import ImageClip, concatenate_videoclips, AudioFileClip, vfx
 import tempfile
+import os
+import PIL.Image
+
+# [중요] 에러 방지 패치: 최신 Pillow 버전 대응
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
 
 st.set_page_config(page_title="비요일 영상 제작소", page_icon="☔")
 st.title("☔ 비요일(Biyoil) 숏폼 자동 제작기")
-st.subheader("4050 타겟 우아한 양우산 홍보 영상")
 
-# 파일 업로드
-images = st.file_uploader("제품 사진 10~15장을 올려주세요", accept_multiple_files=True, type=['jpg', 'jpeg', 'png'])
+# 파일 업로드 섹션
+st.subheader("1. 소스 업로드")
+images = st.file_uploader("제품 사진들을 선택하세요", accept_multiple_files=True, type=['jpg', 'jpeg', 'png'])
 logo = st.file_uploader("브랜드 로고 이미지를 올려주세요", type=['jpg', 'jpeg', 'png'])
+bgm = st.file_uploader("배경음악(MP3)을 올려주세요 (선택사항)", type=['mp3'])
 
-if st.button("영상 생성하기"):
+if st.button("✨ 영상 생성 시작"):
     if images and logo:
-        with st.spinner('영상을 우아하게 제작 중입니다...'):
-            clips = []
-            # 1. 사진 클립 생성 (장당 1.5초, 페이드 효과)
-            for img in images:
-                tfile = tempfile.NamedTemporaryFile(delete=False)
-                tfile.write(img.read())
-                clip = ImageClip(tfile.name).set_duration(1.5).resize(height=1920)
-                clip = clip.set_fps(24).crossfadein(0.5)
-                clips.append(clip)
-            
-            # 2. 로고 엔딩 (3초, 줌인 효과)
-            lfile = tempfile.NamedTemporaryFile(delete=False)
-            lfile.write(logo.read())
-            logo_clip = ImageClip(lfile.name).set_duration(3).resize(height=1920)
-            logo_clip = logo_clip.fx(vfx.resize, lambda t: 1 + 0.03 * t) # 서서히 커지는 효과
-            logo_clip = logo_clip.set_fps(24).crossfadein(1.0)
-            clips.append(logo_clip)
-            
-            # 3. 합치기 및 출력
-            final_video = concatenate_videoclips(clips, method="compose")
-            output_path = "biyoil_video.mp4"
-            final_video.write_videofile(output_path, fps=24, codec="libx264")
-            
-            st.video(output_path)
-            st.success("완성되었습니다! 위 영상에서 마우스 우클릭하여 저장하세요.")
+        with st.spinner('영상을 우아하게 제작 중입니다... (약 1분 소요)'):
+            try:
+                clips = []
+                # 1. 사진 클립 생성 (장당 2초로 넉넉하게 설정)
+                for img in images:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tfile:
+                        tfile.write(img.read())
+                        clip = ImageClip(tfile.name).set_duration(2.0).resize(height=1920)
+                        clip = clip.set_fps(24).crossfadein(0.5)
+                        clips.append(clip)
+                
+                # 2. 로고 엔딩 (4초, 서서히 확대되는 무빙)
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as lfile:
+                    lfile.write(logo.read())
+                    logo_clip = ImageClip(lfile.name).set_duration(4.0).resize(height=1920)
+                    logo_clip = logo_clip.fx(vfx.resize, lambda t: 1 + 0.02 * t) 
+                    logo_clip = logo_clip.set_fps(24).crossfadein(1.0)
+                    clips.append(logo_clip)
+                
+                # 3. 영상 합치기
+                final_video = concatenate_videoclips(clips, method="compose")
+                
+                # 4. 음악 입히기
+                if bgm:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as mfile:
+                        mfile.write(bgm.read())
+                        audio = AudioFileClip(mfile.name).set_duration(final_video.duration)
+                        final_video = final_video.set_audio(audio)
+                
+                output_path = "biyoil_final.mp4"
+                final_video.write_videofile(output_path, fps=24, codec="libx264", audio_codec="aac")
+                
+                st.video(output_path)
+                st.success("🎉 완성되었습니다! 위 영상에서 마우스 우클릭하여 저장하세요.")
+                
+            except Exception as e:
+                st.error(f"제작 중 오류가 발생했습니다: {e}")
     else:
-        st.error("사진과 로고를 모두 올려주세요.")
+        st.error("사진과 로고를 모두 등록해주세요.")
